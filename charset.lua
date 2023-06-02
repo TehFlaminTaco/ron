@@ -1,16 +1,16 @@
-local _charset
-= ("\\x00\\x09\\x20\\x0A\\x0D+-()0123456789ABCDEFX\\x5C/᛫᛬᛭ᚠᚢᚦᚩᚱᚳᚷᚹᚻᚾᛁᛄᛇᛈᛉᛋᛏᛒᛖᛗᛚᛝᛟᛞᚪᚫᛠᚣᛣᚸᛢᛥᛡ"):gsub(
-	"\\x(..)",
-	function(hex)
-		local num = tonumber("0x" .. hex)
-		if num then
-			return string.char(num)
+local _charset = ("\\x00\\x09\\x20\\x0A\\x0D+-()0123456789ABCDEFX\\x5C/᛫᛬᛭ᚠᚢᚦᚩᚱᚳᚷᚹᚻᚾᛁᛄᛇᛈᛉᛋᛏᛒᛖᛗᛚᛝᛟᛞᚪᚫᛠᚣᛣᚸᛢᛥᛡ"
+	):gsub(
+		"\\x(..)",
+		function(hex)
+			local num = tonumber("0x" .. hex)
+			if num then
+				return string.char(num)
+			end
+			return ""
 		end
-		return ""
-	end
-)
+	)
 local Charset = {}
-for s in _charset:gmatch"[%z\1-\127\194-\244][\128-\191]*" do
+for s in _charset:gmatch "[%z\1-\127\194-\244][\128-\191]*" do
 	Charset[#Charset + 1] = s
 end
 function Charset:find(symbol)
@@ -56,8 +56,8 @@ local RuneToLatin = {
 	["ᛢ"] = "q", -- Cweorð	Unknown
 	["ᛥ"] = "st", -- Stan	Stone
 	["ᛡ"] = "io", -- Ior
-	["᛫"] = "single",
-	["᛬"] = "multiple",
+	["᛫"] = ".",
+	["᛬"] = ":",
 	["᛭"] = "cross",
 }
 
@@ -114,7 +114,7 @@ table.sort(LatinByLength, function(a, b)
 	return #a > #b
 end)
 
-function FromMixedLatin(chars)
+local function FromMixedLatin(chars)
 	local index = 1
 	local out = ""
 	while index <= #chars do
@@ -135,9 +135,9 @@ function FromMixedLatin(chars)
 	return out
 end
 
-function OnlyCodeSymbols(chars)
+local function OnlyCodeSymbols(chars)
 	local out = ""
-	for s in chars:gmatch"[%z\1-\127\194-\244][\128-\191]*" do
+	for s in chars:gmatch "[%z\1-\127\194-\244][\128-\191]*" do
 		local index = Charset:find(s)
 		if index and index > 4 then
 			out = out .. s
@@ -146,11 +146,11 @@ function OnlyCodeSymbols(chars)
 	return out
 end
 
-function CharsetToBinary(chars)
+local function CharsetToBinary(chars)
 	local out = ""
 	local bits = 0
 	local n = 0
-	for s in chars:gmatch"[%z\1-\127\194-\244][\128-\191]*" do
+	for s in chars:gmatch "[%z\1-\127\194-\244][\128-\191]*" do
 		local index = Charset:find(s)
 		if index then
 			n = n * (2 ^ 6)
@@ -174,11 +174,11 @@ function CharsetToBinary(chars)
 	return out
 end
 
-function BinaryToCharset(bytes)
+local function BinaryToCharset(bytes)
 	local out = ""
 	local bits = 0
 	local n = 0
-	for s in bytes:gmatch"." do
+	for s in bytes:gmatch "." do
 		n = n * (2 ^ 8)
 		n = n + s:byte()
 		bits = bits + 8
@@ -187,6 +187,42 @@ function BinaryToCharset(bytes)
 			n = n - (high * (2 ^ (bits - 6)))
 			out = out .. Charset[high + 1]
 			bits = bits - 6
+		end
+	end
+	return out
+end
+
+local function CharsetToLatin(code)
+	code = OnlyCodeSymbols(code)
+	local out = "";
+	local last = ""
+	local untranslated = ""
+	for s in code:gmatch "[%z\1-\127\194-\244][\128-\191]*" do
+		untranslated = untranslated .. s
+		local latin = RuneToLatin[s];
+		if latin ~= nil then
+			if OnlyCodeSymbols(FromMixedLatin(out .. latin)) ~= untranslated then
+				out = out .. " "
+				if OnlyCodeSymbols(FromMixedLatin(out .. latin)) ~= untranslated then
+					print("Not sure why this doesn't translate?")
+					print(untranslated)
+					print(out, latin)
+				end
+			end
+			out = out .. latin
+			if latin == "single" then
+				out = out .. " "
+			end
+			if latin == "multiple" then
+				out = out .. "\n"
+			end
+			if latin == "cross" then
+				out = out .. "\n\n"
+			end
+			last = latin
+		else
+			last = s
+			out = out .. s
 		end
 	end
 	return out
@@ -201,4 +237,5 @@ return {
 	CharsetToBinary = CharsetToBinary,
 	BinaryToCharset = BinaryToCharset,
 	OnlyCodeSymbols = OnlyCodeSymbols,
+	CharsetToLatin = CharsetToLatin
 }

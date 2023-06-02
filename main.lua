@@ -1,4 +1,5 @@
-local Charset = require"charset"
+local Charset = require "charset"
+local Parser = require "parser"
 
 local args = { ... }
 
@@ -28,7 +29,7 @@ if not f then
 	print("File not found: " .. file)
 	return
 end
-local code = f:read"*a"
+local code = f:read "*a"
 if flags["g"] then
 	code = Charset.FromMixedLatin(code)
 	code = Charset.OnlyCodeSymbols(code)
@@ -36,17 +37,30 @@ if flags["g"] then
 	local binary = code
 	code = Charset.BinaryToCharset(code)
 	local count = 0
-	for s in code:gmatch"[%z\1-\127\194-\244][\128-\191]*" do
+	for s in code:gmatch "[%z\1-\127\194-\244][\128-\191]*" do
 		count = count + 1
 	end
 	print("Symbols: " .. count)
 	print(code)
 	print("Bytes: " .. #binary)
-	for s in binary:gmatch"." do
+	for s in binary:gmatch "." do
 		io.write(string.format("%02X ", s:byte()))
 	end
 	print()
 else
 	code = Charset.BinaryToCharset(code)
 	code = Charset.OnlyCodeSymbols(code)
+end
+
+local spells = Parser.GetSpells(code)
+local finalMana = Parser.RunSpell({ spells = spells }, #spells)
+
+if flags["t"] then
+	print("Latin: " .. Charset.CharsetToLatin(code))
+end
+
+if flags["m"] then
+	for manaType, value in pairs(finalMana) do
+		print(manaType .. ":", value)
+	end
 end
